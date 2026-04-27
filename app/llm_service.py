@@ -6,7 +6,7 @@ from typing import Any, Dict
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from app.rag_service import retrieve_context
+from app.rag_service import retrieve_context, retrieve_from_text
 
 load_dotenv()
 
@@ -103,23 +103,35 @@ EVALUATION_SCHEMA = {
 
 def generate_interview_questions(resume_text: str, job_description: str) -> Dict[str, Any]:
     query = f"{resume_text} {job_description}"
-    context_chunks = retrieve_context(query)
-    context_text = "\n".join(context_chunks)
+
+    knowledge_chunks = retrieve_context(query)
+    resume_chunks = retrieve_from_text(
+        text=resume_text,
+        query=job_description,
+        top_k=3
+    )
+
+    knowledge_context = "\n".join(knowledge_chunks)
+    resume_context = "\n".join(resume_chunks)
 
     prompt = f"""
 You are an AI interview coach.
 
-Use the context, resume, and job description to generate interview questions.
+Use the knowledge context, resume context, and job description to generate interview questions.
 
 Rules:
-- Make questions specific to the resume and job description.
-- Use the provided context when relevant.
+- Make questions specific to the candidate's actual resume.
+- Use resume context when creating resume-based questions.
+- Use knowledge context when creating AI/backend/system design questions.
 - Do not invent experience not shown in the resume.
 
-Context:
-{context_text}
+Knowledge Context:
+{knowledge_context}
 
-Resume:
+Resume Context:
+{resume_context}
+
+Full Resume:
 {resume_text}
 
 Job Description:

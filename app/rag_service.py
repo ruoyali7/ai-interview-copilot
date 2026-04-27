@@ -12,9 +12,27 @@ def load_knowledge_base(file_path: str) -> str:
         return file.read()
 
 
-def split_into_chunks(text: str) -> list[str]:
-    chunks = text.split("\n\n")
-    return [chunk.strip() for chunk in chunks if chunk.strip()]
+def split_into_chunks(text: str, chunk_size: int = 300, overlap: int = 75) -> list[str]:
+    """
+    Split text into overlapping chunks.
+
+    chunk_size: number of words per chunk
+    overlap: number of words overlap between chunks
+    """
+
+    words = text.split()
+    chunks = []
+
+    start = 0
+    while start < len(words):
+        end = start + chunk_size
+        chunk_words = words[start:end]
+        chunk = " ".join(chunk_words)
+        chunks.append(chunk)
+
+        start += chunk_size - overlap
+
+    return chunks
 
 
 def index_documents(chunks: list[str]) -> None:
@@ -22,6 +40,7 @@ def index_documents(chunks: list[str]) -> None:
 
     if existing_count > 0:
         return
+    print(f"Indexing {len(chunks)} chunks into ChromaDB")  
 
     for i, chunk in enumerate(chunks):
         embedding = embedding_model.encode(chunk).tolist()
@@ -55,3 +74,32 @@ def retrieve_context(query: str, top_k: int = 3) -> list[str]:
         print(doc)
 
     return retrieved_docs
+
+def retrieve_from_text(text: str, query: str, top_k: int = 3) -> list[str]:
+    """
+    Build a temporary vector collection from input text,
+    then retrieve the most relevant chunks for the query.
+    """
+
+    chunks = split_into_chunks(text)
+
+    temp_client = chromadb.Client()
+    temp_collection = temp_client.get_or_create_collection(name="temp_resume_collection")
+
+    for i, chunk in enumerate(chunks):
+        embedding = embedding_model.encode(chunk).tolist()
+
+        temp_collection.add(
+            ids=[str(i)],
+            embeddings=[embedding],
+            documents=[chunk]
+        )
+
+    query_embedding = embedding_model.encode(query).tolist()
+
+    results = temp_collection.query(
+        query_embeddings=[query_embedding],
+        n_results=min(top_k, len(chunks))
+    )
+
+    return results["documents"][0]
