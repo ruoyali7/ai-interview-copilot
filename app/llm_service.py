@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 from app.rag_service import retrieve_context, retrieve_from_text
+from app.logger import logger
 
 load_dotenv()
 
@@ -34,7 +35,7 @@ def call_openai_json(prompt: str, schema: Dict[str, Any], max_retries: int = 3) 
             return json.loads(response.output_text)
 
         except Exception as e:
-            print(f"OpenAI API error. Attempt {attempt + 1}/{max_retries}: {e}")
+            logger.warning("OpenAI API error. Attempt %s/%s: %s", attempt + 1, max_retries, e)
 
             if attempt == max_retries - 1:
                 return {

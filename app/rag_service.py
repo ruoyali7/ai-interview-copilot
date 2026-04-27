@@ -1,5 +1,6 @@
 import chromadb
 from sentence_transformers import SentenceTransformer, CrossEncoder
+from app.logger import logger
 
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 
@@ -42,7 +43,7 @@ def index_documents(chunks: list[str]) -> None:
 
     if existing_count > 0:
         return
-    print(f"Indexing {len(chunks)} chunks into ChromaDB")  
+    logger.info("Indexing %s chunks into ChromaDB", len(chunks))  
 
     for i, chunk in enumerate(chunks):
         embedding = embedding_model.encode(chunk).tolist()
@@ -70,16 +71,9 @@ def retrieve_context(query: str, top_k: int = 3) -> list[str]:
     retrieved_docs = results["documents"][0]
     reranked_docs = rerank_chunks(query, retrieved_docs, top_k=top_k)
 
-    print("===== RAG QUERY =====")
-    print(query)
-
-    print("===== RETRIEVED BEFORE RERANK =====")
-    for doc in retrieved_docs:
-        print(doc)
-
-    print("===== RERANKED CONTEXT =====")
-    for doc in reranked_docs:
-        print(doc)
+    logger.info("RAG query: %s", query)
+    logger.info("Retrieved docs before reranking: %s", retrieved_docs)
+    logger.info("Reranked docs: %s", reranked_docs)
 
     return reranked_docs
 
@@ -112,7 +106,7 @@ def retrieve_from_text(text: str, query: str, top_k: int = 3) -> list[str]:
 
     retrieved_docs = results["documents"][0]
     return rerank_chunks(query, retrieved_docs, top_k=top_k)
-    
+
 
 def rerank_chunks(query: str, chunks: list[str], top_k: int = 3) -> list[str]:
     if not chunks:
@@ -123,5 +117,8 @@ def rerank_chunks(query: str, chunks: list[str], top_k: int = 3) -> list[str]:
 
     scored_chunks = list(zip(chunks, scores))
     scored_chunks.sort(key=lambda x: x[1], reverse=True)
+
+    for chunk, score in scored_chunks:
+        logger.info("Rerank score %.4f | chunk: %s", score, chunk[:120])
 
     return [chunk for chunk, score in scored_chunks[:top_k]]
